@@ -49,9 +49,8 @@ uint32_t reg[ARCHLEN] = {0b0};
 
 void execute_instruction()
 {
-    uint32_t opcode, rd, rs1, rs2, funct3;
+    uint32_t opcode, rd, rs1, rs2, funct3, val=0, val2;
     int32_t imm, cond;
-    uint32_t addr, val=0, val2;
 
     opcode = inst & OPCODE_MASK;
     rd = (inst & RD_MASK) >> 7;
@@ -161,30 +160,49 @@ void execute_instruction()
 
     case 0b1100011: 
         // BRANCH
-        funct3 = (inst >> 12) & 7;
-        switch(funct3 >> 1) {
-        case 0:
-            //beq/bne
-            printf("BEQ/BNE\n");
+        funct3 = (inst & FUNCT3_MASK) >> 12;
+        switch(funct3) {
+        case 0b000:
+            //beq
+            printf("BEQ");
             cond = (reg[rs1] == reg[rs2]);
+            printf("Cond saindo: %d\n", cond);
             break;
-        case 2: 
-            //blt/bge
-            printf("BLT/BGE\n");
+        case 0b001:
+            //bneq
+            printf("BNE\n");
+            cond = (reg[rs1] != reg[rs2]);
+            printf("Cond saindo: %d\n", cond);
+            break;
+        case 0b100: 
+            //blt
+            printf("BLT\n");
             cond = ((int32_t)reg[rs1] < (int32_t)reg[rs2]);
             break;
-        case 3: 
-            //bltu/bgeu
-            printf("BLTU/BGEU\n");
+        case 0b101: 
+            //bge
+            printf("BGE\n");
+            cond = ((int32_t)reg[rs1] >= (int32_t)reg[rs2]);
+            break;
+        case 0b110: 
+            //bltu
+            printf("BLTU\n");
             cond = (reg[rs1] < reg[rs2]);
+            break;
+        case 0b111: 
+            //bgeu
+            printf("BGEU\n");
+            cond = (reg[rs1] >= reg[rs2]);
             break;
         default:
             printf("Instrução branch não reconhecida\n");
             return;
         }
-        cond ^= (funct3 & 1);
+        // cond ^= (funct3 & 1);
         if (cond) {
             imm = ((inst & IMM12_MASK) >> 19) + ((inst & IMM11_MASK) << 4) + ((inst & IMM10_5_MASK) >> 20) + ((inst & IMM4_1_MASK) >> 7);
+            
+
             next_pc = (int32_t)(pc + imm);
             break;
         }
@@ -194,7 +212,6 @@ void execute_instruction()
 
         funct3 = (inst >> 12) & 7;
         imm = (int32_t)inst >> 20;
-        addr = reg[rs1] + imm;
         switch(funct3) {
 
         case 0: /* lb */
@@ -244,7 +261,6 @@ void execute_instruction()
 
         funct3 = (inst >> 12) & 7;
         imm = ((inst & IMM11_5_MASK) >> 20) + (inst & IMM4_0_MASK) >> 7;
-        addr = reg[rs1] + imm;
         val = reg[rs2];
         switch(funct3) {
 
@@ -328,15 +344,15 @@ void execute_instruction()
 void riscv_decoder()
 {
     while(pc <= last_instruction) {
-      if(pc != 0) {
-        next_pc = pc + 4;
-      }
-
       // inst = 0x02208133;
       inst = ram[pc];
+      next_pc = pc + 1;
+
+      // printf("insstruction: %lu", inst);
       execute_instruction();
 
       pc = next_pc;
+      printf("pc instruction end: %d\n", pc);
   }
 }
 
@@ -364,9 +380,12 @@ int main(int argc, char** argv)
         mem_pos += 1;
     }
 
+    printf("mem_pos: %d\n", mem_pos);
+    printf("pc init: %d\n", pc);
+
     last_instruction = mem_pos - 1;
 
-    // riscv_decoder();
+    riscv_decoder();
     printf("Registradores:\n");
     for(int i = 0; i < ARCHLEN; i++) {
         printf("R[%i]: %i\n", i, reg[i]);
