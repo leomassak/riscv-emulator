@@ -7,19 +7,44 @@
 
 #define RAM_SIZE 0b0010000000000000000
 
-#define OPCODE_MASK 0b0000000000000000000000001111111
-#define RD_MASK 0b0000000000000000000111110000000
-#define RS1_MASK 0b0000000000011111000000000000000
-#define RS2_MASK 0b0000001111100000000000000000000
+//COMMON MASKS
+#define OPCODE_MASK 0b00000000000000000000000001111111
+#define RD_MASK 0b00000000000000000000111110000000
+#define RS1_MASK 0b00000000000011111000000000000000
+#define RS2_MASK 0b00000001111100000000000000000000
+#define FUNCT3_MASK 0b00000000000000000111000000000000
+
+//OP-IMM MASKS
+#define OP_IMM_MASK 0b11111111111100000000000000000000
+
+//STORE MASKS
+#define IMM4_0_MASK 0b00000000000000000000111110000000
+#define IMM11_5_MASK 0b11111110000000000000000000000000
+
+//BRANCH MASKS
+#define IMM11_MASK 0b00000000000000000000000010000000
+#define IMM4_1_MASK 0b00000000000000000000111100000000
+#define IMM10_5_MASK 0b01111110000000000000000000000000
+#define IMM12_MASK 0b10000000000000000000000000000000
+
+//U-TYPE MASKS
+#define U_IMM_MASK 0b11111111111111111111000000000000
+
+//J-TYPE MASKS
+#define IMM19_12_MASK 0b00000000000011111111000000000000
+#define J_IMM11_MASK 0b00000000000100000000000000000000
+#define IMM10_1_MASK 0b01111111111000000000000000000000
+#define IMM20_MASK 0b10000000000000000000000000000000
 
 uint8_t ram[RAM_SIZE];
 
+uint32_t mem_pos = 0;
+
+uint32_t last_instruction;
 uint32_t pc;
 uint32_t next_pc;
 uint32_t inst;
-uint32_t reg[ARCHLEN];
-
-uint32_t ram_start = 0;
+uint32_t reg[ARCHLEN] = {0b0};
 
 unsigned char buffer[ARCHLEN];
 
@@ -30,9 +55,9 @@ void execute_instruction()
     uint32_t addr, val=0, val2;
 
     opcode = inst & OPCODE_MASK;
-    rd = (inst >> 7) & RD_MASK;
-    rs1 = (inst >> 15) & RS1_MASK;
-    rs2 = (inst >> 20) & RS2_MASK;
+    rd = (inst & RD_MASK) >> 7;
+    rs1 = (inst & RS1_MASK) >> 15;
+    rs2 = (inst & RS2_MASK) >> 20;
 
     switch(opcode) {
 
@@ -91,21 +116,22 @@ void execute_instruction()
             reg[rd] = val;
         break;
 
-    case 0b0110111: 
+    case 0b0110111:
+        imm = inst & U_IMM_MASK; 
         //lui
         if (rd != 0)
-            reg[rd] = (int32_t)(inst & 0b11111111111111111111000000000000);
+            reg[rd] = (int32_t)(imm << 12);
         break;
 
     case 0b0010111: 
         //auipc
         if (rd != 0)
-            reg[rd] = (int32_t)(pc + (int32_t)(inst & 0b11111111111111111111000000000000));
+            reg[rd] = (int32_t)(pc + (int32_t)(imm << 12));
         break;
 
     case 0b1101111: 
         //jal
-        imm = ((inst & 0b11111111000000000000) << 11);
+        imm = ((inst & IMM20_MASK) >> 11) + (inst & IMM19_12_MASK) + ((inst & J_IMM11_MASK) >> 9) + ((inst & IMM10_1_MASK) >> 20);
         if (rd != 0)
             reg[rd] = pc + 4;
         next_pc = (int32_t)(pc + imm);
@@ -113,9 +139,9 @@ void execute_instruction()
 
     case 0b1100111: 
         //jalr
-        imm = (int32_t)inst >> 20;
+        imm = (int32_t)(inst & OP_IMM_MASK) >> 20;
         val = pc + 4;
-        next_pc = (int32_t)(reg[rs1] + imm);
+        next_pc = (int32_t)(reg[rs1] + imm) & ~1;
         if (rd != 0)
             reg[rd] = val;
         break;
@@ -142,11 +168,7 @@ void execute_instruction()
         }
         cond ^= (funct3 & 1);
         if (cond) {
-            imm = ((inst >> (31 - 12)) & (1 << 12)) |
-                  ((inst >> (25 - 5)) & 0b11111100000) |
-                  ((inst >> (8 - 1)) & 0b0011110) |
-                  ((inst << (11 - 7)) & (1 << 11));
-            imm = (imm << 19) >> 19;
+            imm = ((inst & IMM12_MASK) >> 19) + ((inst & IMM11_MASK) << 4) + ((inst & IMM10_5_MASK) >> 20) + ((inst & IMM4_1_MASK) >> 7);
             next_pc = (int32_t)(pc + imm);
             break;
         }
@@ -161,56 +183,36 @@ void execute_instruction()
 
         case 0: /* lb */
         {
-            uint8_t rval;
-    
-            uint8_t* p = ram + addr;
-            rval = p[0];
-            val = (int8_t)rval;
+            val = (int8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 1: /* lh */
         {
-            uint16_t rval;
-    
-            uint16_t* p = ram + addr;
-            rval = p[0];
-            val = (int16_t)rval;
+            val = (int16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
 
         case 2: /* lw */
         {
-            uint32_t rval;
-
-            uint32_t* p = ram + addr;
-            rval = p[0];
-            val = (int32_t)rval;
+            val = (int32_t)ram[reg[rs1]];
         }
         break;
 
         case 4: /* lbu */
         {
-             uint8_t rval;
-    
-            uint8_t* p = ram + addr;
-            rval = p[0];
-            val = rval;
+            val = (uint8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 5: /* lhu */
         {
-            uint16_t rval;
-    
-            uint16_t* p = ram + addr;
-            rval = p[0];
-            val = rval;
+            val = (uint16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
 
         default:
-            print("Instrucao de Load nao identificada.");
+            printf("Instrucao de Load nao identificada.");
             return;
         }
         if (rd != 0)
@@ -219,32 +221,26 @@ void execute_instruction()
 
     case 0b0100011: /* STORE */
 
-        uint32_t h = inst & 0b111111100000000000000000000000;
-        uint32_t l = inst & 0b000000000000000000000000011111;
-                                                
         funct3 = (inst >> 12) & 7;
-        imm = (h >> 18) + l;
+        imm = ((inst & IMM11_5_MASK) >> 20) + (inst & IMM4_0_MASK) >> 7;
         addr = reg[rs1] + imm;
         val = reg[rs2];
         switch(funct3) {
 
         case 0: /* sb */
-            uint8_t* p = ram + addr;
-            p[0] = val & 0b11111111;
+            ram[reg[rs1]] = (int8_t)(reg[rs2] & 0b00000000000000000000000011111111);
             break;
 
         case 1: /* sh */
-            uint8_t* p = ram + addr;
-            p[0] = val & 0b11111111;
-            p[1] = (val >> 8) & 0b11111111;
+            ram[reg[rs1]] = (int16_t)(reg[rs2] & 0b00000000000000001111111111111111);
             break;
 
         case 2: /* sw */
-            uint8_t* p = ram + addr;
-            p[0] = val & 0b11111111;
-            p[1] = (val >> 8) & 0b11111111;
-            p[2] = (val >> 16) & 0b11111111;
-            p[3] = (val >> 24) & 0b11111111;
+            if((imm & 0b100000000000) >> 11 == 1) {
+              uint32_t two_complement = ~imm & 0b0111111111111;
+              imm = ~two_complement;
+            }
+            ram[reg[rs1] + imm] = (int32_t)(reg[rs2]);
             break;
 
         default:
@@ -256,12 +252,13 @@ void execute_instruction()
     case 0b0010011: /* OP-IMM */
 
         funct3 = (inst >> 12) & 7;
-        imm = (int32_t)inst >> 20;
+        imm = (inst & OP_IMM_MASK) >> 20;
         switch(funct3) {
         case 0: /* addi */
             val = (int32_t)(reg[rs1] + imm);
             break;
         case 1: /* slli */
+            val = (int32_t)reg[rs1] << (int32_t)reg[imm];
             break;
         case 2: /* slti */
             val = (int32_t)reg[rs1] < (int32_t)imm;
@@ -294,33 +291,45 @@ void execute_instruction()
 
 void riscv_decoder()
 {
-    while (1) {
+    while(pc <= last_instruction) {
+      if(pc != 0) {
         next_pc = pc + 4;
+      }
 
-        inst = buffer;
-        execute_instruction();
+      inst = ram[pc];
+      execute_instruction();
 
-        pc = next_pc;
-    }
+      pc = next_pc;
+  }
 }
 
 int main(int argc, char** argv)
 {
+    pc = -1;
     FILE *ptr;
 
-    ptr = fopen("test.bin","rb");
+    ptr = fopen("prog.bin","rb");
 
     
     if (!ptr) {
         perror("fopen");
         exit(EXIT_FAILURE);
-    } 
+    }
 
-    fread(buffer,sizeof(buffer),1,ptr);
+    while (!feof(ptr)){     
+        if(pc == -1) {
+            pc = 0;
+            next_pc = 0;
+            fread(&ram[0],4,1,ptr);
+        } else {
+            fread(&ram[mem_pos],4,1,ptr);
+        }
+        mem_pos += 1;
+    }
 
-    pc = ram_start;
+    last_instruction = mem_pos - 1;
+
     riscv_decoder();
-
     printf("Registradores:\n");
     for(int i = 0; i < ARCHLEN; i++) {
         printf("R[%i]: %i\n", i, reg[i]);
