@@ -5,7 +5,7 @@
 
 #define ARCHLEN 32
 
-#define RAM_SIZE 0b0010000000000000000
+#define RAM_SIZE 0b1000000000000
 
 //COMMON MASKS
 #define OPCODE_MASK 0b00000000000000000000000001111111
@@ -36,7 +36,7 @@
 #define IMM10_1_MASK 0b01111111111000000000000000000000
 #define IMM20_MASK 0b10000000000000000000000000000000
 
-uint8_t ram[RAM_SIZE];
+uint8_t ram[RAM_SIZE] = {0b0};
 
 uint32_t mem_pos = 0;
 
@@ -46,7 +46,6 @@ uint32_t next_pc;
 uint32_t inst;
 uint32_t reg[ARCHLEN] = {0b0};
 
-unsigned char buffer[ARCHLEN];
 
 void execute_instruction()
 {
@@ -71,42 +70,52 @@ void execute_instruction()
         case 0: 
             //add
             val = (int32_t)(val + val2);
+            printf("ADD\n");
             break;
         case 0 | 8: 
             //sub
             val = (int32_t)(val - val2);
+            printf("SUB\n");
             break;
         case 1: 
             //sll
             val = (int32_t)(val << (val2 & (ARCHLEN - 1)));
+            printf("SLL\n");
             break;
         case 2: 
             //slt
             val = (int32_t)val < (int32_t)val2;
+            printf("SLT\n");
             break;
         case 3: 
             //sltu
             val = val < val2;
+            printf("SLTU\n");
             break;
         case 4: 
             //xor
             val = val ^ val2;
+            printf("XOR\n");
             break;
         case 5: 
             //srl
             val = (int32_t)((uint32_t)val >> (val2 & (ARCHLEN - 1)));
+            printf("SRL\n");
             break;
         case 5 | 8:
             //sra
             val = (int32_t)val >> (val2 & (ARCHLEN - 1));
+            printf("SRA\n");
             break;
         case 6: 
             //or
             val = val | val2;
+            printf("OR\n");
             break;
         case 7: 
             //and
             val = val & val2;
+            printf("AND\n");
             break;
         default:
             printf("Operação não reconhecida\n");
@@ -119,18 +128,21 @@ void execute_instruction()
     case 0b0110111:
         imm = inst & U_IMM_MASK; 
         //lui
+        printf("LUI\n");
         if (rd != 0)
             reg[rd] = (int32_t)(imm << 12);
         break;
 
     case 0b0010111: 
         //auipc
+        printf("AUIPC\n");
         if (rd != 0)
             reg[rd] = (int32_t)(pc + (int32_t)(imm << 12));
         break;
 
     case 0b1101111: 
         //jal
+        printf("JAL\n");
         imm = ((inst & IMM20_MASK) >> 11) + (inst & IMM19_12_MASK) + ((inst & J_IMM11_MASK) >> 9) + ((inst & IMM10_1_MASK) >> 20);
         if (rd != 0)
             reg[rd] = pc + 4;
@@ -139,6 +151,7 @@ void execute_instruction()
 
     case 0b1100111: 
         //jalr
+        printf("JARL\n");
         imm = (int32_t)(inst & OP_IMM_MASK) >> 20;
         val = pc + 4;
         next_pc = (int32_t)(reg[rs1] + imm) & ~1;
@@ -152,18 +165,21 @@ void execute_instruction()
         switch(funct3 >> 1) {
         case 0:
             //beq/bne
+            printf("BEQ/BNE\n");
             cond = (reg[rs1] == reg[rs2]);
             break;
         case 2: 
             //blt/bge
+            printf("BLT/BGE\n");
             cond = ((int32_t)reg[rs1] < (int32_t)reg[rs2]);
             break;
         case 3: 
             //bltu/bgeu
+            printf("BLTU/BGEU\n");
             cond = (reg[rs1] < reg[rs2]);
             break;
         default:
-            printf("Instrução branch não reconhecida");
+            printf("Instrução branch não reconhecida\n");
             return;
         }
         cond ^= (funct3 & 1);
@@ -183,36 +199,41 @@ void execute_instruction()
 
         case 0: /* lb */
         {
-            val = (int8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
+          printf("LB\n");
+          val = (int8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 1: /* lh */
         {
-            val = (int16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
+          printf("LH\n");
+          val = (int16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
 
         case 2: /* lw */
         {
-            val = (int32_t)ram[reg[rs1]];
+          printf("LW\n");
+          val = (int32_t)ram[reg[rs1]];
         }
         break;
 
         case 4: /* lbu */
         {
-            val = (uint8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
+          printf("LBU\n");
+          val = (uint8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 5: /* lhu */
         {
-            val = (uint16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
+          printf("LHU\n");
+          val = (uint16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
 
         default:
-            printf("Instrucao de Load nao identificada.");
+            printf("Instrucao de Load nao identificada.\n");
             return;
         }
         if (rd != 0)
@@ -228,14 +249,17 @@ void execute_instruction()
         switch(funct3) {
 
         case 0: /* sb */
+            printf("SB\n");
             ram[reg[rs1]] = (int8_t)(reg[rs2] & 0b00000000000000000000000011111111);
             break;
 
         case 1: /* sh */
+            printf("SH\n");
             ram[reg[rs1]] = (int16_t)(reg[rs2] & 0b00000000000000001111111111111111);
             break;
 
         case 2: /* sw */
+            printf("SW\n");
             if((imm & 0b100000000000) >> 11 == 1) {
               uint32_t two_complement = ~imm & 0b0111111111111;
               imm = ~two_complement;
@@ -244,7 +268,7 @@ void execute_instruction()
             break;
 
         default:
-            printf("Instrucao de store nao identificada.");
+            printf("Instrucao de store nao identificada.\n");
             return;
         }
         break;
@@ -253,28 +277,40 @@ void execute_instruction()
 
         funct3 = (inst >> 12) & 7;
         imm = (inst & OP_IMM_MASK) >> 20;
+        if((imm & 0b100000000000) >> 11 == 1) {
+              uint32_t two_complement = ~imm & 0b0111111111111;
+              imm = ~two_complement;
+        }
+
         switch(funct3) {
         case 0: /* addi */
+            printf("ADDI\n");
             val = (int32_t)(reg[rs1] + imm);
             break;
         case 1: /* slli */
+            printf("SLLI\n");
             val = (int32_t)reg[rs1] << (int32_t)reg[imm];
             break;
         case 2: /* slti */
+            printf("SLTI\n");
             val = (int32_t)reg[rs1] < (int32_t)imm;
             break;
         case 3: /* sltiu */
+            printf("SLTIU\n");
             val = reg[rs1] < (uint32_t)imm;
             break;
         case 4: /* xori */
+            printf("XORI\n");
             val = reg[rs1] ^ imm;
             break;
-        case 5: /* ori */
+        case 5: /* srli/srai */
             break;
         case 6: /* ori */
+            printf("ORI\n");
             val = reg[rs1] | imm;
             break;
         case 7: /* andi */
+            printf("ANDI\n");
             val = reg[rs1] & imm;
             break;
         }
@@ -283,7 +319,7 @@ void execute_instruction()
         break;
 
     default:
-        printf("Instrução não reconhecida");
+        printf("Instrução não reconhecida\n");
         return;
     }
 }
@@ -296,6 +332,7 @@ void riscv_decoder()
         next_pc = pc + 4;
       }
 
+      // inst = 0x02208133;
       inst = ram[pc];
       execute_instruction();
 
@@ -304,38 +341,38 @@ void riscv_decoder()
 }
 
 int main(int argc, char** argv)
-{
+{ 
     pc = -1;
-    FILE *ptr;
+    FILE *fl;
 
-    ptr = fopen("prog.bin","rb");
+    fl = fopen("prog.bin","rb");
 
     
-    if (!ptr) {
+    if (!fl) {
         perror("fopen");
         exit(EXIT_FAILURE);
     }
 
-    while (!feof(ptr)){     
+    while (!feof(fl)){     
         if(pc == -1) {
             pc = 0;
             next_pc = 0;
-            fread(&ram[0],4,1,ptr);
+            fread(&ram[0],4,1,fl);
         } else {
-            fread(&ram[mem_pos],4,1,ptr);
+            fread(&ram[mem_pos],4,1,fl);
         }
         mem_pos += 1;
     }
 
     last_instruction = mem_pos - 1;
 
-    riscv_decoder();
+    // riscv_decoder();
     printf("Registradores:\n");
     for(int i = 0; i < ARCHLEN; i++) {
         printf("R[%i]: %i\n", i, reg[i]);
     }
 
     printf("\n");
-    fclose(ptr);
+    fclose(fl);
     return 0;
 }
