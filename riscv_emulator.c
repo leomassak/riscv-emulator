@@ -80,11 +80,11 @@ void execute_instruction()
             if(funct7 == 0b0000000) {
                 //add
                 reg[rd] = (int32_t)(val + val2);
-                printf("ADD x%lu x%lu x%lu\n", rd, rs2, rs1);
+                printf("ADD x%lu x%lu x%lu\n", rd, rs1, rs2);
             } else if (funct7 == 0b0100000) {
                 //sub
                 reg[rd] = (int32_t)(val - val2);
-                printf("SUB x%lu x%lu x%lu\n", rd, rs2, rs1);
+                printf("SUB x%lu x%lu x%lu\n", rd, rs1, rs2);
             } else {
                 printf("Operação não reconhecida\n");
             }
@@ -92,32 +92,32 @@ void execute_instruction()
         case 0b001: 
             //sll
             reg[rd] = (int32_t)(val << (val2 & (ARCHLEN - 1)));
-            printf("SLL\n");
+            printf("SLL x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         case 0b010: 
             //slt
             reg[rd] = (int32_t)val < (int32_t)val2;
-            printf("SLT\n");
+            printf("SLT x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         case 0b011: 
             //sltu
             reg[rd] = val < val2;
-            printf("SLTU\n");
+            printf("SLTU x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         case 0b100: 
             //xor
             reg[rd] = val ^ val2;
-            printf("XOR\n");
+            printf("XOR x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         case 0b101:
             if(funct7 == 0b0000000) {
                 //srl
                 reg[rd] = (int32_t)((uint32_t)val >> (val2 & (ARCHLEN - 1)));
-                printf("SRL\n");
+                printf("SRL x%lu x%lu x%lu\n", rd, rs1, rs2);
             } else if (funct7 == 0b0100000) {
                 //sra
                 reg[rd] = (int32_t)val >> (val2 & (ARCHLEN - 1));
-                printf("SRA\n");
+                printf("SRA x%lu x%lu x%lu\n", rd, rs1, rs2);
             } else {
                 printf("Operação não reconhecida\n");
             }
@@ -125,12 +125,12 @@ void execute_instruction()
         case 0b110: 
             //or
             reg[rd] = val | val2;
-            printf("OR\n");
+            printf("OR x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         case 0b111: 
             //and
             reg[rd] = val & val2;
-            printf("AND\n");
+            printf("AND x%lu x%lu x%lu\n", rd, rs1, rs2);
             break;
         default:
             printf("Operação não reconhecida\n");
@@ -160,9 +160,8 @@ void execute_instruction()
 
     case 0b1100111: 
         //jalr
-        printf("JARL\n");
         imm = (int32_t)(inst & OP_IMM_MASK) >> 20;
-        printf("JARL X%lu %lu\n", rd, imm);
+        printf("JALR X%lu %lu\n", rd, imm);
         pc = (int32_t)(reg[rs1] + imm) & ~1;
         reg[rd] = pc + 4;
         break;
@@ -227,35 +226,35 @@ void execute_instruction()
 
         case 0b000: /* lb */
         {
-          printf("LB\n");
+          printf("LB X%lu %lu\n", rd, imm);
           val = (int8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 0b001: /* lh */
         {
-          printf("LH\n");
+          printf("LH X%lu %lu\n", rd, imm);
           val = (int16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
 
         case 0b010: /* lw */
         {
-          printf("LW\n");
+          printf("LW X%lu %lu\n", rd, imm);
           val = (int32_t)ram[reg[rs1]];
         }
         break;
 
         case 0b100: /* lbu */
         {
-          printf("LBU\n");
+          printf("LBU X%lu %lu\n", rd, imm);
           val = (uint8_t)ram[reg[rs1] & 0b00000000000000000000000011111111];
         }
         break;
 
         case 0b101: /* lhu */
         {
-          printf("LHU\n");
+          printf("LHU X%lu %lu\n", rd, imm);
           val = (uint16_t)ram[reg[rs1] & 0b00000000000000001111111111111111];
         }
         break;
@@ -276,17 +275,17 @@ void execute_instruction()
         switch(funct3) {
 
         case 0b000: /* sb */
-            printf("SB\n");
+            printf("SB x%lu %lu(x%lu)\n", rs1, imm, rs2);
             ram[reg[rs1]] = (int8_t)(reg[rs2] & 0b00000000000000000000000011111111);
             break;
 
         case 0b001: /* sh */
-            printf("SH\n");
+            printf("SH x%lu %lu(x%lu)\n", rs1, imm, rs2);
             ram[reg[rs1]] = (int16_t)(reg[rs2] & 0b00000000000000001111111111111111);
             break;
 
         case 0b010: /* sw */
-            printf("SW\n");
+            printf("SW x%lu %lu(x%lu)\n", rs1, imm, rs2);
             if((imm & 0b100000000000) >> 11 == 1) {
               uint32_t two_complement = ~imm & 0b0111111111111;
               imm = ~two_complement;
@@ -314,30 +313,31 @@ void execute_instruction()
             reg[rd] = (int32_t)(reg[rs1] + imm);
             break;
         case 0b001: /* slli */
-            printf("SLLI\n");
+            printf("SLLI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = (int32_t)reg[rs1] << (int32_t)reg[imm];
             break;
         case 0b010: /* slti */
-            printf("SLTI\n");
+            printf("SLTI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = (int32_t)reg[rs1] < (int32_t)imm;
             break;
         case 0b011: /* sltiu */
-            printf("SLTIU\n");
+            printf("SLTIU x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = reg[rs1] < (uint32_t)imm;
             break;
         case 0b100: /* xori */
-            printf("XORI\n");
+            printf("XORI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = reg[rs1] ^ imm;
             break;
         case 0b101: /* srli */
+            printf("SRLI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = (uint8_t)reg[rs1] >> imm;
             break;
         case 0b110: /* ori */
-            printf("ORI\n");
+            printf("ORI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = reg[rs1] | imm;
             break;
         case 0b111: /* andi */
-            printf("ANDI\n");
+            printf("ANDI x%lu x%lu %lu\n", rd, rs1, imm);
             reg[rd] = reg[rs1] & imm;
             break;
         }
@@ -390,7 +390,6 @@ int main(int argc, char** argv)
     }
 
     printf("mem_pos: %d\n", mem_pos);
-    printf("pc init: %d\n\n", pc);
 
     printf("RAM:\n");
     for(int i = 0; i < ARCHLEN; i++) {
